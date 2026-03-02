@@ -9,16 +9,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download release APK
-        run: |
-          curl -L ${{ github.event.release.assets[0].browser_download_url }} -o app.apk
-
-      - name: Install AWS CLI
+      - name: Install required tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y awscli
+          sudo apt-get install -y awscli jq
 
-      - name: Upload to R2
+      - name: Wait for APK asset and download
+        run: |
+          echo "Checking for APK asset..."
+
+          for i in {1..12}
+          do
+            URL=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest \
+            | jq -r '.assets[] | select(.name | endswith(".apk")) | .browser_download_url')
+
+            if [ -n "$URL" ] && [ "$URL" != "null" ]; then
+              echo "APK found: $URL"
+              curl -L "$URL" -o app.apk
+              break
+            fi
+
+            echo "APK not ready yet. Waiting 10 seconds..."
+            sleep 10
+          done
+
+          if [ ! -f app.apk ]; then
+            echo "APK was not found after waiting."
+            exit 1
+          fi
+
+      - name: Upload to Cloudflare R2
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
