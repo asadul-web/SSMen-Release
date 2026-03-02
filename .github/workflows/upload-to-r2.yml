@@ -1,0 +1,28 @@
+name: Upload APK to Cloudflare R2
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download release APK
+        run: |
+          curl -L ${{ github.event.release.assets[0].browser_download_url }} -o app.apk
+
+      - name: Install AWS CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y awscli
+
+      - name: Upload to R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          aws s3 cp app.apk s3://${{ secrets.R2_BUCKET_NAME }}/app.apk \
+            --endpoint-url=${{ secrets.R2_ENDPOINT }} \
+            --region auto
